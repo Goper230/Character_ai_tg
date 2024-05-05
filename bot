@@ -1,0 +1,44 @@
+from characterai import aiocai, sendCode, authUser
+import asyncio
+import telebot
+from threading import Thread
+
+bot = telebot.TeleBot("your bot token")
+
+async def main():
+    email = "Your Email"
+    code = sendCode(email)
+    link = input('CODE IN MAIL: ')
+    token = authUser(link, email)
+    info = await aiocai.get_me(token=token)
+    print(info)
+    char = input('CHAR ID: ')
+    client = aiocai.Client(token)
+    me = await client.get_me()
+
+    async with await client.connect() as chat:  
+        new, answer = await chat.new_chat(
+            char, me.id
+        )
+        @bot.message_handler(func=lambda message: True)
+        def send_character_message(message):
+            char_id = char
+            async def send_and_receive(message_text, user_id):
+                async with await client.connect() as chat:
+                    a = str(message.from_user.first_name)
+                    space = ' '
+                    message_text = message_text + space + a
+                    answer = await chat.send_message(char_id, new.chat_id, message_text)
+                    return answer
+
+            answer = asyncio.run(send_and_receive(message.text, message.from_user.id))
+            bot.send_message(message.chat.id, f'(Имя пользователя: {message.from_user.first_name}) {answer.name}: {answer.text}')
+
+    await bot.infinity_polling()
+
+# Запустим функцию main в отдельном потоке
+thread = Thread(target=lambda: asyncio.run(main()))
+thread.start()
+
+# Присоединимся к потоку, чтобы бот продолжил работу
+thread.join()
